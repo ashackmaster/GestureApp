@@ -1,6 +1,6 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Float, MeshDistortMaterial } from '@react-three/drei';
+import { Environment, Float, MeshDistortMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { GestureState } from '@/hooks/useHandTracking';
 
@@ -13,46 +13,54 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const targetRotation = useRef({ x: 0, y: 0 });
   const targetScale = useRef(1);
-
-  useEffect(() => {
-    if (gesture.isOpenHand && !gesture.isPinching) {
-      targetRotation.current.x += gesture.rotation.x * 0.5;
-      targetRotation.current.y += gesture.rotation.y * 0.5;
-    }
-
-    if (gesture.isPinching) {
-      const scale = Math.max(0.5, Math.min(2, 1 + (0.05 - gesture.pinchDistance) * 10));
-      targetScale.current = scale;
-    }
-
-    if (gesture.isFist) {
-      targetRotation.current = { x: 0, y: 0 };
-      targetScale.current = 1;
-    }
-  }, [gesture]);
+  const velocity = useRef({ x: 0, y: 0 });
 
   useFrame((state, delta) => {
     if (meshRef.current) {
-      // Smooth rotation
+      // Apply gesture controls with improved physics
+      if (gesture.isOpenHand && !gesture.isPinching) {
+        velocity.current.x += gesture.rotation.x * 0.3;
+        velocity.current.y += gesture.rotation.y * 0.3;
+      }
+
+      // Apply friction
+      velocity.current.x *= 0.95;
+      velocity.current.y *= 0.95;
+
+      targetRotation.current.x += velocity.current.x;
+      targetRotation.current.y += velocity.current.y;
+
+      if (gesture.isPinching) {
+        const scale = Math.max(0.4, Math.min(2.5, 1 + (0.06 - gesture.pinchDistance) * 15));
+        targetScale.current = scale;
+      }
+
+      if (gesture.isFist) {
+        targetRotation.current = { x: 0, y: 0 };
+        targetScale.current = 1;
+        velocity.current = { x: 0, y: 0 };
+      }
+
+      // Smooth interpolation
       meshRef.current.rotation.x = THREE.MathUtils.lerp(
         meshRef.current.rotation.x,
         targetRotation.current.x,
-        0.1
+        0.08
       );
       meshRef.current.rotation.y = THREE.MathUtils.lerp(
         meshRef.current.rotation.y,
         targetRotation.current.y,
-        0.1
+        0.08
       );
 
-      // Smooth scaling
       meshRef.current.scale.setScalar(
-        THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale.current, 0.1)
+        THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale.current, 0.08)
       );
 
-      // Idle animation when no gesture
+      // Gentle idle animation
       if (!gesture.palmPosition) {
-        meshRef.current.rotation.y += delta * 0.2;
+        meshRef.current.rotation.y += delta * 0.15;
+        meshRef.current.rotation.x += delta * 0.05;
       }
     }
   });
@@ -60,30 +68,32 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
   const getGeometry = () => {
     switch (modelType) {
       case 'torus':
-        return <torusKnotGeometry args={[1, 0.3, 128, 32]} />;
+        return <torusKnotGeometry args={[1, 0.35, 200, 40]} />;
       case 'sphere':
-        return <sphereGeometry args={[1.2, 64, 64]} />;
+        return <sphereGeometry args={[1.3, 128, 128]} />;
       case 'cube':
-        return <boxGeometry args={[1.5, 1.5, 1.5]} />;
+        return <boxGeometry args={[1.6, 1.6, 1.6]} />;
       case 'icosahedron':
-        return <icosahedronGeometry args={[1.2, 1]} />;
+        return <icosahedronGeometry args={[1.3, 2]} />;
       default:
-        return <torusKnotGeometry args={[1, 0.3, 128, 32]} />;
+        return <torusKnotGeometry args={[1, 0.35, 200, 40]} />;
     }
   };
 
+  const distortAmount = gesture.isPinching ? 0.5 : gesture.isOpenHand ? 0.25 : 0.15;
+
   return (
-    <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.5}>
+    <Float speed={2} rotationIntensity={0.15} floatIntensity={0.4}>
       <mesh ref={meshRef}>
         {getGeometry()}
         <MeshDistortMaterial
           color="#00ffff"
           emissive="#00ffff"
-          emissiveIntensity={0.3}
-          metalness={0.9}
-          roughness={0.1}
-          distort={gesture.isPinching ? 0.4 : 0.2}
-          speed={2}
+          emissiveIntensity={gesture.isPinching ? 0.5 : 0.25}
+          metalness={0.95}
+          roughness={0.05}
+          distort={distortAmount}
+          speed={3}
         />
       </mesh>
     </Float>
@@ -92,19 +102,22 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
 
 const ParticleField = () => {
   const pointsRef = useRef<THREE.Points>(null);
-  const particleCount = 500;
+  const particleCount = 800;
   
-  const positions = new Float32Array(particleCount * 3);
-  for (let i = 0; i < particleCount * 3; i += 3) {
-    positions[i] = (Math.random() - 0.5) * 20;
-    positions[i + 1] = (Math.random() - 0.5) * 20;
-    positions[i + 2] = (Math.random() - 0.5) * 20;
-  }
+  const positions = useMemo(() => {
+    const pos = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount * 3; i += 3) {
+      pos[i] = (Math.random() - 0.5) * 25;
+      pos[i + 1] = (Math.random() - 0.5) * 25;
+      pos[i + 2] = (Math.random() - 0.5) * 25;
+    }
+    return pos;
+  }, []);
 
   useFrame((state) => {
     if (pointsRef.current) {
-      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.02;
-      pointsRef.current.rotation.x = state.clock.elapsedTime * 0.01;
+      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.015;
+      pointsRef.current.rotation.x = state.clock.elapsedTime * 0.008;
     }
   });
 
@@ -119,10 +132,10 @@ const ParticleField = () => {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.03}
+        size={0.025}
         color="#00ffff"
         transparent
-        opacity={0.6}
+        opacity={0.5}
         sizeAttenuation
       />
     </points>
@@ -142,15 +155,16 @@ const Scene3D = ({ gesture, modelType }: Scene3DProps) => {
         gl={{ antialias: true, alpha: true }}
       >
         <color attach="background" args={['#070a0f']} />
-        <fog attach="fog" args={['#070a0f', 5, 20]} />
+        <fog attach="fog" args={['#070a0f', 5, 25]} />
         
-        <ambientLight intensity={0.2} />
-        <pointLight position={[10, 10, 10]} intensity={1} color="#00ffff" />
-        <pointLight position={[-10, -10, -10]} intensity={0.5} color="#ff00ff" />
+        <ambientLight intensity={0.15} />
+        <pointLight position={[10, 10, 10]} intensity={1.2} color="#00ffff" />
+        <pointLight position={[-10, -10, -10]} intensity={0.6} color="#ff00ff" />
+        <pointLight position={[0, -10, 5]} intensity={0.4} color="#00ff88" />
         <spotLight
-          position={[0, 5, 0]}
-          intensity={0.8}
-          angle={0.5}
+          position={[0, 8, 0]}
+          intensity={1}
+          angle={0.4}
           penumbra={1}
           color="#00ffff"
         />
@@ -159,11 +173,6 @@ const Scene3D = ({ gesture, modelType }: Scene3DProps) => {
         <ParticleField />
 
         <Environment preset="night" />
-        <OrbitControls
-          enableZoom={false}
-          enablePan={false}
-          enableRotate={false}
-        />
       </Canvas>
     </div>
   );

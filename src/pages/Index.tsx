@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useHandTracking } from '@/hooks/useHandTracking';
 import Scene3D from '@/components/Scene3D';
-import HandTrackingOverlay from '@/components/HandTrackingOverlay';
-import ControlPanel from '@/components/ControlPanel';
 import Header from '@/components/Header';
 import GestureIndicator from '@/components/GestureIndicator';
+import MiniCameraOverlay from '@/components/MiniCameraOverlay';
+import ModelSelector from '@/components/ModelSelector';
 
 type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron';
 
@@ -14,11 +14,14 @@ const Index = () => {
     videoRef,
     canvasRef,
     isTracking,
-    isLoading,
     gesture,
     startTracking,
-    stopTracking,
   } = useHandTracking();
+
+  // Auto-start tracking on mount
+  useEffect(() => {
+    startTracking();
+  }, []);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background">
@@ -35,38 +38,18 @@ const Index = () => {
       {/* Header */}
       <Header />
 
-      {/* Control Panel */}
-      <ControlPanel
-        isTracking={isTracking}
-        isLoading={isLoading}
-        modelType={modelType}
-        onStartTracking={startTracking}
-        onStopTracking={stopTracking}
-        onModelChange={setModelType}
-      />
+      {/* Model Selector - minimal UI */}
+      <ModelSelector modelType={modelType} onModelChange={setModelType} />
 
-      {/* Hand Tracking Overlay */}
-      <HandTrackingOverlay
+      {/* Mini Camera Overlay - small corner */}
+      <MiniCameraOverlay
         videoRef={videoRef}
         canvasRef={canvasRef}
         isTracking={isTracking}
-        gesture={gesture}
       />
 
       {/* Gesture Indicator */}
       <GestureIndicator gesture={gesture} isTracking={isTracking} />
-
-      {/* Instructions */}
-      {!isTracking && (
-        <div className="absolute bottom-6 right-6 z-20 max-w-xs">
-          <div className="glass-panel p-4 text-sm">
-            <p className="text-muted-foreground">
-              Click <span className="text-primary font-semibold">Start Tracking</span> to enable hand gesture controls. 
-              Use your hand movements to interact with the 3D model.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
