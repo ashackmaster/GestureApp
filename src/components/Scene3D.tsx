@@ -17,8 +17,8 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
 
   useFrame((state, delta) => {
     if (meshRef.current) {
-      // Apply gesture controls with improved physics
-      if (gesture.isOpenHand && !gesture.isPinching) {
+      // Open hand = move/rotate model
+      if (gesture.isOpenHand) {
         velocity.current.x += gesture.rotation.x * 0.3;
         velocity.current.y += gesture.rotation.y * 0.3;
       }
@@ -30,11 +30,17 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
       targetRotation.current.x += velocity.current.x;
       targetRotation.current.y += velocity.current.y;
 
-      if (gesture.isPinching) {
-        const scale = Math.max(0.4, Math.min(2.5, 1 + (0.06 - gesture.pinchDistance) * 15));
-        targetScale.current = scale;
+      // Zoom in: Index + Thumb open
+      if (gesture.isZoomIn) {
+        targetScale.current = Math.min(3, targetScale.current + 0.02);
       }
 
+      // Zoom out: Only index finger
+      if (gesture.isZoomOut) {
+        targetScale.current = Math.max(0.3, targetScale.current - 0.02);
+      }
+
+      // Fist = reset
       if (gesture.isFist) {
         targetRotation.current = { x: 0, y: 0 };
         targetScale.current = 1;
@@ -80,7 +86,7 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
     }
   };
 
-  const distortAmount = gesture.isPinching ? 0.5 : gesture.isOpenHand ? 0.25 : 0.15;
+  const distortAmount = gesture.isZoomIn ? 0.5 : gesture.isZoomOut ? 0.3 : gesture.isOpenHand ? 0.25 : 0.15;
 
   return (
     <Float speed={2} rotationIntensity={0.15} floatIntensity={0.4}>
@@ -89,7 +95,7 @@ const InteractiveModel = ({ gesture, modelType }: ModelProps) => {
         <MeshDistortMaterial
           color="#00ffff"
           emissive="#00ffff"
-          emissiveIntensity={gesture.isPinching ? 0.5 : 0.25}
+          emissiveIntensity={gesture.isZoomIn ? 0.5 : gesture.isZoomOut ? 0.4 : 0.25}
           metalness={0.95}
           roughness={0.05}
           distort={distortAmount}

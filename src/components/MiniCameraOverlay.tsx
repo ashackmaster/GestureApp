@@ -1,4 +1,5 @@
 import { RefObject } from 'react';
+import { Hand, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface MiniCameraOverlayProps {
   videoRef: RefObject<HTMLVideoElement>;
@@ -13,7 +14,7 @@ const MiniCameraOverlay = ({
 }: MiniCameraOverlayProps) => {
   return (
     <div className="absolute bottom-4 left-4 z-20">
-      <div className="relative w-36 h-24 rounded-lg overflow-hidden border border-primary/30 bg-background/30 backdrop-blur-sm shadow-lg shadow-primary/10">
+      <div className="relative w-40 h-28 rounded-lg overflow-hidden border border-primary/30 bg-background/30 backdrop-blur-sm shadow-lg shadow-primary/10">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
@@ -37,6 +38,28 @@ const MiniCameraOverlay = ({
             isTracking ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground'
           }`}
         />
+      </div>
+      
+      {/* Gesture Guide */}
+      <div className="mt-2 p-2 rounded-lg bg-background/40 backdrop-blur-sm border border-border/20 text-[10px]">
+        <div className="grid grid-cols-2 gap-1">
+          <div className="flex items-center gap-1.5 text-cyan-400">
+            <Hand className="w-3 h-3" />
+            <span>Move</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-green-400">
+            <ZoomIn className="w-3 h-3" />
+            <span>Thumb+Index</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-orange-400">
+            <ZoomOut className="w-3 h-3" />
+            <span>Index Only</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-pink-400">
+            <RotateCcw className="w-3 h-3" />
+            <span>Fist</span>
+          </div>
+        </div>
       </div>
     </div>
   );

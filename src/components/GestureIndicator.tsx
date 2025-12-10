@@ -1,5 +1,5 @@
 import { GestureState } from '@/hooks/useHandTracking';
-import { Hand, Maximize2, RotateCcw } from 'lucide-react';
+import { Hand, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface GestureIndicatorProps {
   gesture: GestureState;
@@ -9,12 +9,14 @@ interface GestureIndicatorProps {
 const GestureIndicator = ({ gesture, isTracking }: GestureIndicatorProps) => {
   if (!isTracking) return null;
 
-  const activeGesture = gesture.isPinching
-    ? { icon: Maximize2, label: 'ZOOM', color: 'text-secondary' }
+  const activeGesture = gesture.isZoomIn
+    ? { icon: ZoomIn, label: 'ZOOM IN', color: 'text-green-400', bg: 'bg-green-500/20', border: 'border-green-500/30' }
+    : gesture.isZoomOut
+    ? { icon: ZoomOut, label: 'ZOOM OUT', color: 'text-orange-400', bg: 'bg-orange-500/20', border: 'border-orange-500/30' }
     : gesture.isOpenHand
-    ? { icon: Hand, label: 'ROTATE', color: 'text-primary' }
+    ? { icon: Hand, label: 'MOVE', color: 'text-cyan-400', bg: 'bg-cyan-500/20', border: 'border-cyan-500/30' }
     : gesture.isFist
-    ? { icon: RotateCcw, label: 'RESET', color: 'text-destructive' }
+    ? { icon: RotateCcw, label: 'RESET', color: 'text-pink-400', bg: 'bg-pink-500/20', border: 'border-pink-500/30' }
     : null;
 
   if (!activeGesture) return null;
@@ -23,7 +25,7 @@ const GestureIndicator = ({ gesture, isTracking }: GestureIndicatorProps) => {
 
   return (
     <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-background/20 backdrop-blur-sm border border-border/20">
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${activeGesture.bg} backdrop-blur-sm border ${activeGesture.border}`}>
         <Icon className={`w-4 h-4 ${activeGesture.color}`} />
         <span className={`text-xs font-display tracking-widest ${activeGesture.color}`}>
           {activeGesture.label}
