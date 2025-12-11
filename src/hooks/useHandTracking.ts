@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Hands, Results } from '@mediapipe/hands';
-import { Camera } from '@mediapipe/camera_utils';
+import { FilesetResolver, HandLandmarker, HandLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface HandLandmark {
   x: number;
@@ -22,8 +21,8 @@ const SMOOTHING_FACTOR = 0.3;
 export const useHandTracking = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const handsRef = useRef<Hands | null>(null);
-  const cameraRef = useRef<Camera | null>(null);
+  const handLandmarkerRef = useRef<HandLandmarker | null>(null);
+  const animationFrameIdRef = useRef<number | null>(null);
   
   const [isTracking, setIsTracking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +53,6 @@ export const useHandTracking = () => {
     mcp: HandLandmark,
     wrist: HandLandmark
   ): boolean => {
-    // Calculate distances
     const tipToWrist = Math.sqrt(
       Math.pow(tip.x - wrist.x, 2) + Math.pow(tip.y - wrist.y, 2)
     );
@@ -65,7 +63,6 @@ export const useHandTracking = () => {
       Math.pow(mcp.x - wrist.x, 2) + Math.pow(mcp.y - wrist.y, 2)
     );
     
-    // Finger is extended if tip is further from wrist than pip
     return tipToWrist > pipToWrist * 0.95 && tipToWrist > mcpToWrist;
   }, []);
 
@@ -76,7 +73,6 @@ export const useHandTracking = () => {
     wrist: HandLandmark,
     indexMcp: HandLandmark
   ): boolean => {
-    // For thumb, check distance from index MCP (spread detection)
     const thumbToIndexMcp = Math.sqrt(
       Math.pow(thumbTip.x - indexMcp.x, 2) + Math.pow(thumbTip.y - indexMcp.y, 2)
     );
@@ -101,22 +97,18 @@ export const useHandTracking = () => {
     const pinkyPip = handLandmarks[18];
     const pinkyMcp = handLandmarks[17];
 
-    // Palm center calculation
     const palmX = (wrist.x + indexMcp.x + middleMcp.x + pinkyMcp.x) / 4;
     const palmY = (wrist.y + indexMcp.y + middleMcp.y + pinkyMcp.y) / 4;
     const palmPosition = { x: palmX, y: palmY };
 
-    // Check each finger
     const thumbExtended = isThumbExtended(thumbTip, thumbIp, thumbMcp, wrist, indexMcp);
     const indexExtended = isFingerExtended(indexTip, indexPip, indexMcp, wrist);
     const middleExtended = isFingerExtended(middleTip, middlePip, middleMcp, wrist);
     const ringExtended = isFingerExtended(ringTip, ringPip, ringMcp, wrist);
     const pinkyExtended = isFingerExtended(pinkyTip, pinkyPip, pinkyMcp, wrist);
 
-    // Count extended fingers
     const extendedCount = [indexExtended, middleExtended, ringExtended, pinkyExtended].filter(Boolean).length;
 
-    // Gesture detection with new rules:
     // 1. Index + Thumb open (others closed) = Zoom In
     const isZoomIn = thumbExtended && indexExtended && !middleExtended && !ringExtended && !pinkyExtended;
 
@@ -129,7 +121,6 @@ export const useHandTracking = () => {
     // 4. All fingers closed = Fist/Reset
     const isFist = extendedCount === 0 && !thumbExtended;
 
-    // Calculate rotation based on palm movement with smoothing (only for open hand)
     let rotation = { x: 0, y: 0 };
     if (prevPalmPosition.current && isOpenHand) {
       const deltaX = (palmPosition.x - prevPalmPosition.current.x) * 10;
@@ -164,10 +155,8 @@ export const useHandTracking = () => {
     animationFrame.current += 0.05;
     const pulse = Math.sin(animationFrame.current) * 0.5 + 0.5;
 
-    // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Get gesture color
     let primaryColor = '#00ffff';
     let secondaryColor = '#0088aa';
     if (gestureState.isZoomIn) {
@@ -184,7 +173,6 @@ export const useHandTracking = () => {
       secondaryColor = '#0088aa';
     }
 
-    // Draw palm circle (large background)
     const palmCenter = {
       x: (handLandmarks[0].x + handLandmarks[5].x + handLandmarks[9].x + handLandmarks[13].x + handLandmarks[17].x) / 5,
       y: (handLandmarks[0].y + handLandmarks[5].y + handLandmarks[9].y + handLandmarks[13].y + handLandmarks[17].y) / 5
@@ -199,7 +187,6 @@ export const useHandTracking = () => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw rotating outer ring around palm
     ctx.save();
     ctx.translate(palmCenter.x * width, palmCenter.y * height);
     ctx.rotate(animationFrame.current);
@@ -216,23 +203,15 @@ export const useHandTracking = () => {
     ctx.stroke();
     ctx.restore();
 
-    // Enhanced connection drawing
     const connections = [
-      // Thumb
       [0, 1], [1, 2], [2, 3], [3, 4],
-      // Index
       [0, 5], [5, 6], [6, 7], [7, 8],
-      // Middle
       [0, 9], [9, 10], [10, 11], [11, 12],
-      // Ring
       [0, 13], [13, 14], [14, 15], [15, 16],
-      // Pinky
       [0, 17], [17, 18], [18, 19], [19, 20],
-      // Palm connections
       [5, 9], [9, 13], [13, 17], [5, 17]
     ];
 
-    // Draw connections with gradient effect
     connections.forEach(([start, end]) => {
       const startPoint = handLandmarks[start];
       const endPoint = handLandmarks[end];
@@ -255,18 +234,15 @@ export const useHandTracking = () => {
       ctx.shadowBlur = 0;
     });
 
-    // Draw all landmarks with different sizes and effects
     handLandmarks.forEach((landmark, index) => {
       const x = landmark.x * width;
       const y = landmark.y * height;
       
-      // Fingertips get special treatment
       const isFingertip = [4, 8, 12, 16, 20].includes(index);
       const isKnuckle = [5, 9, 13, 17].includes(index);
       const isJoint = [1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19].includes(index);
       const isWrist = index === 0;
 
-      // Draw outer glow ring for fingertips
       if (isFingertip) {
         const glowSize = 18 + pulse * 8;
         ctx.beginPath();
@@ -274,7 +250,6 @@ export const useHandTracking = () => {
         ctx.fillStyle = `${primaryColor}20`;
         ctx.fill();
         
-        // Animated ring
         ctx.beginPath();
         ctx.arc(x, y, 12 + pulse * 4, 0, Math.PI * 2);
         ctx.strokeStyle = `${primaryColor}60`;
@@ -282,7 +257,6 @@ export const useHandTracking = () => {
         ctx.stroke();
       }
 
-      // Main point
       let pointSize = 4;
       let pointColor = secondaryColor;
       
@@ -300,7 +274,6 @@ export const useHandTracking = () => {
         pointColor = secondaryColor;
       }
 
-      // Draw point
       ctx.beginPath();
       ctx.arc(x, y, pointSize, 0, Math.PI * 2);
       ctx.fillStyle = pointColor;
@@ -309,14 +282,12 @@ export const useHandTracking = () => {
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Draw inner highlight
       ctx.beginPath();
       ctx.arc(x - pointSize * 0.2, y - pointSize * 0.2, pointSize * 0.4, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff80';
       ctx.fill();
     });
 
-    // Draw fingertip connections (curved lines between fingertips)
     ctx.beginPath();
     ctx.strokeStyle = `${primaryColor}40`;
     ctx.lineWidth = 1;
@@ -331,9 +302,7 @@ export const useHandTracking = () => {
     });
     ctx.stroke();
 
-    // Draw gesture-specific indicators
     if (gestureState.isZoomIn) {
-      // Draw line between thumb and index
       ctx.beginPath();
       ctx.moveTo(handLandmarks[4].x * width, handLandmarks[4].y * height);
       ctx.lineTo(handLandmarks[8].x * width, handLandmarks[8].y * height);
@@ -344,7 +313,6 @@ export const useHandTracking = () => {
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Draw plus icon
       const midX = (handLandmarks[4].x + handLandmarks[8].x) / 2 * width;
       const midY = (handLandmarks[4].y + handLandmarks[8].y) / 2 * height;
       ctx.beginPath();
@@ -358,7 +326,6 @@ export const useHandTracking = () => {
     }
 
     if (gestureState.isZoomOut) {
-      // Draw circle around index finger
       const indexTip = handLandmarks[8];
       ctx.beginPath();
       ctx.arc(indexTip.x * width, indexTip.y * height, 25 + pulse * 10, 0, Math.PI * 2);
@@ -369,7 +336,6 @@ export const useHandTracking = () => {
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Draw minus icon
       ctx.beginPath();
       ctx.moveTo(indexTip.x * width - 10, indexTip.y * height);
       ctx.lineTo(indexTip.x * width + 10, indexTip.y * height);
@@ -379,7 +345,6 @@ export const useHandTracking = () => {
     }
 
     if (gestureState.isFist) {
-      // Draw reset indicator around palm
       ctx.save();
       ctx.translate(palmCenter.x * width, palmCenter.y * height);
       ctx.rotate(-animationFrame.current * 2);
@@ -391,7 +356,6 @@ export const useHandTracking = () => {
       ctx.shadowColor = '#ff0066';
       ctx.stroke();
       
-      // Arrow head
       ctx.beginPath();
       ctx.moveTo(45, 0);
       ctx.lineTo(35, -10);
@@ -403,7 +367,6 @@ export const useHandTracking = () => {
     }
 
     if (gestureState.isOpenHand) {
-      // Draw direction arrow based on palm movement
       if (gestureState.rotation.x !== 0 || gestureState.rotation.y !== 0) {
         const arrowLength = 40;
         const angle = Math.atan2(-gestureState.rotation.x, gestureState.rotation.y);
@@ -424,7 +387,6 @@ export const useHandTracking = () => {
           ctx.shadowColor = '#00ffff';
           ctx.stroke();
           
-          // Arrow head
           ctx.beginPath();
           ctx.moveTo(0, -palmRadius - 10 - scaledLength);
           ctx.lineTo(-8, -palmRadius - scaledLength);
@@ -438,21 +400,21 @@ export const useHandTracking = () => {
     }
   }, []);
 
-  const onResults = useCallback((results: Results) => {
+  const processResults = useCallback((results: HandLandmarkerResult) => {
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
         const width = canvasRef.current.width;
         const height = canvasRef.current.height;
         
-        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-          const handLandmarks = results.multiHandLandmarks[0];
-          setLandmarks(handLandmarks as HandLandmark[]);
+        if (results.landmarks && results.landmarks.length > 0) {
+          const handLandmarks = results.landmarks[0] as HandLandmark[];
+          setLandmarks(handLandmarks);
           
-          const gestureState = calculateGesture(handLandmarks as HandLandmark[]);
+          const gestureState = calculateGesture(handLandmarks);
           setGesture(gestureState);
 
-          drawEnhancedLandmarks(ctx, handLandmarks as HandLandmark[], gestureState, width, height);
+          drawEnhancedLandmarks(ctx, handLandmarks, gestureState, width, height);
         } else {
           ctx.clearRect(0, 0, width, height);
           setLandmarks(null);
@@ -469,58 +431,76 @@ export const useHandTracking = () => {
     }
   }, [calculateGesture, drawEnhancedLandmarks]);
 
+  const detectHands = useCallback(() => {
+    if (videoRef.current && handLandmarkerRef.current && videoRef.current.readyState >= 2) {
+      const results = handLandmarkerRef.current.detectForVideo(videoRef.current, performance.now());
+      processResults(results);
+    }
+    animationFrameIdRef.current = requestAnimationFrame(detectHands);
+  }, [processResults]);
+
   const startTracking = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
     
     setIsLoading(true);
 
     try {
-      const hands = new Hands({
-        locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      // Initialize MediaPipe Vision
+      const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+      );
+
+      // Create hand landmarker
+      const handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+          delegate: 'GPU'
         },
+        runningMode: 'VIDEO',
+        numHands: 1,
+        minHandDetectionConfidence: 0.7,
+        minHandPresenceConfidence: 0.7,
+        minTrackingConfidence: 0.7
       });
 
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.7,
+      handLandmarkerRef.current = handLandmarker;
+
+      // Start webcam
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 }
       });
-
-      hands.onResults(onResults);
-      handsRef.current = hands;
-
-      const camera = new Camera(videoRef.current, {
-        onFrame: async () => {
-          if (handsRef.current && videoRef.current) {
-            await handsRef.current.send({ image: videoRef.current });
-          }
-        },
-        width: 640,
-        height: 480,
-      });
-
-      cameraRef.current = camera;
-      await camera.start();
       
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+
       setIsTracking(true);
       setIsLoading(false);
+
+      // Start detection loop
+      detectHands();
     } catch (error) {
       console.error('Failed to start hand tracking:', error);
       setIsLoading(false);
     }
-  }, [onResults]);
+  }, [detectHands]);
 
   const stopTracking = useCallback(() => {
-    if (cameraRef.current) {
-      cameraRef.current.stop();
-      cameraRef.current = null;
+    if (animationFrameIdRef.current) {
+      cancelAnimationFrame(animationFrameIdRef.current);
+      animationFrameIdRef.current = null;
     }
-    if (handsRef.current) {
-      handsRef.current.close();
-      handsRef.current = null;
+    
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
+    
+    if (handLandmarkerRef.current) {
+      handLandmarkerRef.current.close();
+      handLandmarkerRef.current = null;
+    }
+    
     setIsTracking(false);
     setLandmarks(null);
   }, []);
