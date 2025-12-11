@@ -18,10 +18,14 @@ const Index = () => {
     startTracking,
   } = useHandTracking();
 
-  // Auto-start tracking on mount
+  // Auto-start tracking when refs are ready
   useEffect(() => {
-    startTracking();
-  }, []);
+    // Small delay to ensure refs are mounted
+    const timer = setTimeout(() => {
+      startTracking();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [startTracking]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background">

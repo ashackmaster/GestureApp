@@ -440,7 +440,12 @@ export const useHandTracking = () => {
   }, [processResults]);
 
   const startTracking = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      console.log('Refs not ready, retrying...');
+      return;
+    }
+    
+    if (isTracking || isLoading) return;
     
     setIsLoading(true);
 
@@ -458,20 +463,33 @@ export const useHandTracking = () => {
         },
         runningMode: 'VIDEO',
         numHands: 1,
-        minHandDetectionConfidence: 0.7,
-        minHandPresenceConfidence: 0.7,
-        minTrackingConfidence: 0.7
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
       });
 
       handLandmarkerRef.current = handLandmarker;
 
       // Start webcam
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 }
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        }
       });
       
       videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      
+      // Wait for video to be ready
+      await new Promise<void>((resolve) => {
+        if (videoRef.current) {
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play();
+            resolve();
+          };
+        }
+      });
 
       setIsTracking(true);
       setIsLoading(false);
@@ -482,7 +500,7 @@ export const useHandTracking = () => {
       console.error('Failed to start hand tracking:', error);
       setIsLoading(false);
     }
-  }, [detectHands]);
+  }, [detectHands, isTracking, isLoading]);
 
   const stopTracking = useCallback(() => {
     if (animationFrameIdRef.current) {
