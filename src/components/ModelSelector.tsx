@@ -1,17 +1,21 @@
 import { Button } from '@/components/ui/button';
-import { Circle, Box, Triangle } from 'lucide-react';
+import { Circle, Box, Triangle, Car, Armchair } from 'lucide-react';
+
+type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair';
 
 interface ModelSelectorProps {
-  modelType: 'torus' | 'sphere' | 'cube' | 'icosahedron';
-  onModelChange: (type: 'torus' | 'sphere' | 'cube' | 'icosahedron') => void;
+  modelType: ModelType;
+  onModelChange: (type: ModelType) => void;
 }
 
 const ModelSelector = ({ modelType, onModelChange }: ModelSelectorProps) => {
-  const models = [
-    { type: 'torus' as const, icon: Circle, label: 'T' },
-    { type: 'sphere' as const, icon: Circle, label: 'S' },
-    { type: 'cube' as const, icon: Box, label: 'C' },
-    { type: 'icosahedron' as const, icon: Triangle, label: 'I' },
+  const models: { type: ModelType; icon: typeof Circle; label: string }[] = [
+    { type: 'torus', icon: Circle, label: 'Torus' },
+    { type: 'sphere', icon: Circle, label: 'Sphere' },
+    { type: 'cube', icon: Box, label: 'Cube' },
+    { type: 'icosahedron', icon: Triangle, label: 'Icosahedron' },
+    { type: 'car', icon: Car, label: 'Car' },
+    { type: 'chair', icon: Armchair, label: 'Chair' },
   ];
 
   return (

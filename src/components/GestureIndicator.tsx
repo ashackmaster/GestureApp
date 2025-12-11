@@ -1,5 +1,5 @@
 import { GestureState } from '@/hooks/useHandTracking';
-import { Hand, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Hand, ZoomIn, ZoomOut, Move, Snowflake, RotateCcw } from 'lucide-react';
 
 interface GestureIndicatorProps {
   gesture: GestureState;
@@ -13,10 +13,14 @@ const GestureIndicator = ({ gesture, isTracking }: GestureIndicatorProps) => {
     ? { icon: ZoomIn, label: 'ZOOM IN', color: 'text-green-400', bg: 'bg-green-500/20', border: 'border-green-500/30' }
     : gesture.isZoomOut
     ? { icon: ZoomOut, label: 'ZOOM OUT', color: 'text-orange-400', bg: 'bg-orange-500/20', border: 'border-orange-500/30' }
+    : gesture.isPeace
+    ? { icon: Move, label: 'POSITION', color: 'text-pink-400', bg: 'bg-pink-500/20', border: 'border-pink-500/30' }
     : gesture.isOpenHand
-    ? { icon: Hand, label: 'MOVE', color: 'text-cyan-400', bg: 'bg-cyan-500/20', border: 'border-cyan-500/30' }
+    ? { icon: Hand, label: 'ROTATE', color: 'text-cyan-400', bg: 'bg-cyan-500/20', border: 'border-cyan-500/30' }
     : gesture.isFist
-    ? { icon: RotateCcw, label: 'RESET', color: 'text-pink-400', bg: 'bg-pink-500/20', border: 'border-pink-500/30' }
+    ? { icon: Snowflake, label: 'FREEZE', color: 'text-purple-400', bg: 'bg-purple-500/20', border: 'border-purple-500/30' }
+    : gesture.isReset
+    ? { icon: RotateCcw, label: 'RESET', color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/30' }
     : null;
 
   if (!activeGesture) return null;

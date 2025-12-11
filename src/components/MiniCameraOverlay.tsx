@@ -1,5 +1,5 @@
 import { RefObject } from 'react';
-import { Hand, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Hand, ZoomIn, ZoomOut, Move, Snowflake, RotateCcw } from 'lucide-react';
 
 interface MiniCameraOverlayProps {
   videoRef: RefObject<HTMLVideoElement>;
@@ -42,22 +42,30 @@ const MiniCameraOverlay = ({
       
       {/* Gesture Guide */}
       <div className="mt-2 p-2 rounded-lg bg-background/40 backdrop-blur-sm border border-border/20 text-[10px]">
-        <div className="grid grid-cols-2 gap-1">
-          <div className="flex items-center gap-1.5 text-cyan-400">
+        <div className="grid grid-cols-3 gap-1">
+          <div className="flex items-center gap-1 text-cyan-400">
             <Hand className="w-3 h-3" />
+            <span>Rotate</span>
+          </div>
+          <div className="flex items-center gap-1 text-green-400">
+            <ZoomIn className="w-3 h-3" />
+            <span>Zoom+</span>
+          </div>
+          <div className="flex items-center gap-1 text-orange-400">
+            <ZoomOut className="w-3 h-3" />
+            <span>Zoom-</span>
+          </div>
+          <div className="flex items-center gap-1 text-pink-400">
+            <Move className="w-3 h-3" />
             <span>Move</span>
           </div>
-          <div className="flex items-center gap-1.5 text-green-400">
-            <ZoomIn className="w-3 h-3" />
-            <span>Thumb+Index</span>
+          <div className="flex items-center gap-1 text-purple-400">
+            <Snowflake className="w-3 h-3" />
+            <span>Freeze</span>
           </div>
-          <div className="flex items-center gap-1.5 text-orange-400">
-            <ZoomOut className="w-3 h-3" />
-            <span>Index Only</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-pink-400">
+          <div className="flex items-center gap-1 text-red-400">
             <RotateCcw className="w-3 h-3" />
-            <span>Fist</span>
+            <span>Reset</span>
           </div>
         </div>
       </div>
