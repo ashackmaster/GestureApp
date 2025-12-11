@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { FilesetResolver, HandLandmarker, HandLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface HandLandmark {
@@ -12,11 +12,12 @@ export interface GestureState {
   isZoomOut: boolean;
   isOpenHand: boolean;
   isFist: boolean;
+  isPeace: boolean; // Index + Middle for position move
+  isReset: boolean; // Thumb + Pinky for reset
   palmPosition: { x: number; y: number } | null;
   rotation: { x: number; y: number };
+  position: { x: number; y: number }; // For position movement
 }
-
-const SMOOTHING_FACTOR = 0.3;
 
 export const useHandTracking = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -32,19 +33,14 @@ export const useHandTracking = () => {
     isZoomOut: false,
     isOpenHand: false,
     isFist: false,
+    isPeace: false,
+    isReset: false,
     palmPosition: null,
     rotation: { x: 0, y: 0 },
+    position: { x: 0, y: 0 },
   });
 
   const prevPalmPosition = useRef<{ x: number; y: number } | null>(null);
-  const smoothedGesture = useRef<GestureState>({
-    isZoomIn: false,
-    isZoomOut: false,
-    isOpenHand: false,
-    isFist: false,
-    palmPosition: null,
-    rotation: { x: 0, y: 0 },
-  });
   const animationFrame = useRef(0);
 
   const isFingerExtended = useCallback((
@@ -118,31 +114,44 @@ export const useHandTracking = () => {
     // 3. All fingers open = Move/Rotate
     const isOpenHand = extendedCount >= 4 && thumbExtended;
 
-    // 4. All fingers closed = Fist/Reset
+    // 4. All fingers closed = Fist/Freeze
     const isFist = extendedCount === 0 && !thumbExtended;
 
+    // 5. Index + Middle open (peace sign) = Position Move
+    const isPeace = indexExtended && middleExtended && !ringExtended && !pinkyExtended && !thumbExtended;
+
+    // 6. Thumb + Pinky open (others closed) = Reset
+    const isReset = thumbExtended && pinkyExtended && !indexExtended && !middleExtended && !ringExtended;
+
+    // Direct rotation without momentum - moves exactly with hand
     let rotation = { x: 0, y: 0 };
     if (prevPalmPosition.current && isOpenHand) {
-      const deltaX = (palmPosition.x - prevPalmPosition.current.x) * 10;
-      const deltaY = (palmPosition.y - prevPalmPosition.current.y) * 10;
-      rotation = { 
-        x: deltaY * SMOOTHING_FACTOR + smoothedGesture.current.rotation.x * (1 - SMOOTHING_FACTOR),
-        y: -deltaX * SMOOTHING_FACTOR + smoothedGesture.current.rotation.y * (1 - SMOOTHING_FACTOR)
-      };
+      const deltaX = (palmPosition.x - prevPalmPosition.current.x) * 3; // Direct multiplier
+      const deltaY = (palmPosition.y - prevPalmPosition.current.y) * 3;
+      rotation = { x: deltaY, y: -deltaX };
     }
+
+    // Position movement for peace gesture
+    let position = { x: 0, y: 0 };
+    if (prevPalmPosition.current && isPeace) {
+      const deltaX = (palmPosition.x - prevPalmPosition.current.x) * 5;
+      const deltaY = (palmPosition.y - prevPalmPosition.current.y) * 5;
+      position = { x: -deltaX, y: -deltaY };
+    }
+
     prevPalmPosition.current = palmPosition;
 
-    const newGesture = {
+    return {
       isZoomIn,
       isZoomOut,
       isOpenHand,
       isFist,
+      isPeace,
+      isReset,
       palmPosition,
       rotation,
+      position,
     };
-
-    smoothedGesture.current = newGesture;
-    return newGesture;
   }, [isFingerExtended, isThumbExtended]);
 
   const drawEnhancedLandmarks = useCallback((
@@ -166,6 +175,12 @@ export const useHandTracking = () => {
       primaryColor = '#ff8800';
       secondaryColor = '#aa5500';
     } else if (gestureState.isFist) {
+      primaryColor = '#8844ff';
+      secondaryColor = '#5522aa';
+    } else if (gestureState.isPeace) {
+      primaryColor = '#ff44aa';
+      secondaryColor = '#aa2277';
+    } else if (gestureState.isReset) {
       primaryColor = '#ff0066';
       secondaryColor = '#aa0044';
     } else if (gestureState.isOpenHand) {
@@ -288,20 +303,7 @@ export const useHandTracking = () => {
       ctx.fill();
     });
 
-    ctx.beginPath();
-    ctx.strokeStyle = `${primaryColor}40`;
-    ctx.lineWidth = 1;
-    const fingertips = [4, 8, 12, 16, 20];
-    fingertips.forEach((idx, i) => {
-      const tip = handLandmarks[idx];
-      if (i === 0) {
-        ctx.moveTo(tip.x * width, tip.y * height);
-      } else {
-        ctx.lineTo(tip.x * width, tip.y * height);
-      }
-    });
-    ctx.stroke();
-
+    // Gesture-specific indicators
     if (gestureState.isZoomIn) {
       ctx.beginPath();
       ctx.moveTo(handLandmarks[4].x * width, handLandmarks[4].y * height);
@@ -345,6 +347,65 @@ export const useHandTracking = () => {
     }
 
     if (gestureState.isFist) {
+      // Freeze indicator - ice crystal pattern
+      ctx.save();
+      ctx.translate(palmCenter.x * width, palmCenter.y * height);
+      for (let i = 0; i < 6; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -40);
+        ctx.strokeStyle = '#8844ff';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#8844ff';
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if (gestureState.isPeace) {
+      // Position move indicator - arrows
+      const indexTip = handLandmarks[8];
+      const middleTip = handLandmarks[12];
+      const midX = (indexTip.x + middleTip.x) / 2 * width;
+      const midY = (indexTip.y + middleTip.y) / 2 * height;
+      
+      // Draw crosshair
+      ctx.beginPath();
+      ctx.strokeStyle = '#ff44aa';
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff44aa';
+      
+      // Arrows
+      const arrowSize = 30;
+      // Up
+      ctx.moveTo(midX, midY - arrowSize);
+      ctx.lineTo(midX - 8, midY - arrowSize + 10);
+      ctx.moveTo(midX, midY - arrowSize);
+      ctx.lineTo(midX + 8, midY - arrowSize + 10);
+      // Down
+      ctx.moveTo(midX, midY + arrowSize);
+      ctx.lineTo(midX - 8, midY + arrowSize - 10);
+      ctx.moveTo(midX, midY + arrowSize);
+      ctx.lineTo(midX + 8, midY + arrowSize - 10);
+      // Left
+      ctx.moveTo(midX - arrowSize, midY);
+      ctx.lineTo(midX - arrowSize + 10, midY - 8);
+      ctx.moveTo(midX - arrowSize, midY);
+      ctx.lineTo(midX - arrowSize + 10, midY + 8);
+      // Right
+      ctx.moveTo(midX + arrowSize, midY);
+      ctx.lineTo(midX + arrowSize - 10, midY - 8);
+      ctx.moveTo(midX + arrowSize, midY);
+      ctx.lineTo(midX + arrowSize - 10, midY + 8);
+      
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    if (gestureState.isReset) {
       ctx.save();
       ctx.translate(palmCenter.x * width, palmCenter.y * height);
       ctx.rotate(-animationFrame.current * 2);
@@ -366,36 +427,34 @@ export const useHandTracking = () => {
       ctx.restore();
     }
 
-    if (gestureState.isOpenHand) {
-      if (gestureState.rotation.x !== 0 || gestureState.rotation.y !== 0) {
-        const arrowLength = 40;
-        const angle = Math.atan2(-gestureState.rotation.x, gestureState.rotation.y);
-        const magnitude = Math.sqrt(gestureState.rotation.x ** 2 + gestureState.rotation.y ** 2);
-        const scaledLength = Math.min(arrowLength, arrowLength * magnitude * 5);
+    if (gestureState.isOpenHand && (gestureState.rotation.x !== 0 || gestureState.rotation.y !== 0)) {
+      const arrowLength = 40;
+      const angle = Math.atan2(-gestureState.rotation.x, gestureState.rotation.y);
+      const magnitude = Math.sqrt(gestureState.rotation.x ** 2 + gestureState.rotation.y ** 2);
+      const scaledLength = Math.min(arrowLength, arrowLength * magnitude * 5);
+      
+      if (scaledLength > 5) {
+        ctx.save();
+        ctx.translate(palmCenter.x * width, palmCenter.y * height);
+        ctx.rotate(angle);
         
-        if (scaledLength > 5) {
-          ctx.save();
-          ctx.translate(palmCenter.x * width, palmCenter.y * height);
-          ctx.rotate(angle);
-          
-          ctx.beginPath();
-          ctx.moveTo(0, -palmRadius - 10);
-          ctx.lineTo(0, -palmRadius - 10 - scaledLength);
-          ctx.strokeStyle = '#00ffff';
-          ctx.lineWidth = 4;
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = '#00ffff';
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, -palmRadius - 10 - scaledLength);
-          ctx.lineTo(-8, -palmRadius - scaledLength);
-          ctx.lineTo(8, -palmRadius - scaledLength);
-          ctx.closePath();
-          ctx.fillStyle = '#00ffff';
-          ctx.fill();
-          ctx.restore();
-        }
+        ctx.beginPath();
+        ctx.moveTo(0, -palmRadius - 10);
+        ctx.lineTo(0, -palmRadius - 10 - scaledLength);
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#00ffff';
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0, -palmRadius - 10 - scaledLength);
+        ctx.lineTo(-8, -palmRadius - scaledLength);
+        ctx.lineTo(8, -palmRadius - scaledLength);
+        ctx.closePath();
+        ctx.fillStyle = '#00ffff';
+        ctx.fill();
+        ctx.restore();
       }
     }
   }, []);
@@ -423,8 +482,11 @@ export const useHandTracking = () => {
             isZoomOut: false,
             isOpenHand: false,
             isFist: false,
+            isPeace: false,
+            isReset: false,
             palmPosition: null,
             rotation: { x: 0, y: 0 },
+            position: { x: 0, y: 0 },
           });
         }
       }
@@ -450,12 +512,10 @@ export const useHandTracking = () => {
     setIsLoading(true);
 
     try {
-      // Initialize MediaPipe Vision
       const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
       );
 
-      // Create hand landmarker
       const handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
@@ -470,7 +530,6 @@ export const useHandTracking = () => {
 
       handLandmarkerRef.current = handLandmarker;
 
-      // Start webcam
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           width: { ideal: 640 },
@@ -481,7 +540,6 @@ export const useHandTracking = () => {
       
       videoRef.current.srcObject = stream;
       
-      // Wait for video to be ready
       await new Promise<void>((resolve) => {
         if (videoRef.current) {
           videoRef.current.onloadedmetadata = () => {
@@ -494,7 +552,6 @@ export const useHandTracking = () => {
       setIsTracking(true);
       setIsLoading(false);
 
-      // Start detection loop
       detectHands();
     } catch (error) {
       console.error('Failed to start hand tracking:', error);
@@ -505,7 +562,6 @@ export const useHandTracking = () => {
   const stopTracking = useCallback(() => {
     if (animationFrameIdRef.current) {
       cancelAnimationFrame(animationFrameIdRef.current);
-      animationFrameIdRef.current = null;
     }
     
     if (videoRef.current && videoRef.current.srcObject) {
@@ -513,21 +569,15 @@ export const useHandTracking = () => {
       tracks.forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
-    
+
     if (handLandmarkerRef.current) {
       handLandmarkerRef.current.close();
       handLandmarkerRef.current = null;
     }
-    
+
     setIsTracking(false);
     setLandmarks(null);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      stopTracking();
-    };
-  }, [stopTracking]);
 
   return {
     videoRef,

@@ -6,7 +6,7 @@ import GestureIndicator from '@/components/GestureIndicator';
 import MiniCameraOverlay from '@/components/MiniCameraOverlay';
 import ModelSelector from '@/components/ModelSelector';
 
-type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron';
+type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair';
 
 const Index = () => {
   const [modelType, setModelType] = useState<ModelType>('torus');
@@ -20,7 +20,6 @@ const Index = () => {
 
   // Auto-start tracking when refs are ready
   useEffect(() => {
-    // Small delay to ensure refs are mounted
     const timer = setTimeout(() => {
       startTracking();
     }, 100);
