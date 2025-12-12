@@ -6,7 +6,7 @@ import GestureIndicator from '@/components/GestureIndicator';
 import MiniCameraOverlay from '@/components/MiniCameraOverlay';
 import ModelSelector from '@/components/ModelSelector';
 
-type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair';
+type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair' | 'solar';
 
 const Index = () => {
   const [modelType, setModelType] = useState<ModelType>('torus');
@@ -41,7 +41,7 @@ const Index = () => {
       {/* Header */}
       <Header />
 
-      {/* Model Selector - minimal UI */}
+      {/* Model Selector - centered bottom navigation */}
       <ModelSelector modelType={modelType} onModelChange={setModelType} />
 
       {/* Mini Camera Overlay - small corner */}
