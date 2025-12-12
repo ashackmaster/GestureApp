@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
-import { Circle, Box, Triangle, Car, Armchair } from 'lucide-react';
+import { Circle, Box, Triangle, Car, Armchair, Globe } from 'lucide-react';
 
-type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair';
+type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair' | 'solar';
 
 interface ModelSelectorProps {
   modelType: ModelType;
@@ -16,24 +16,26 @@ const ModelSelector = ({ modelType, onModelChange }: ModelSelectorProps) => {
     { type: 'icosahedron', icon: Triangle, label: 'Icosahedron' },
     { type: 'car', icon: Car, label: 'Car' },
     { type: 'chair', icon: Armchair, label: 'Chair' },
+    { type: 'solar', icon: Globe, label: 'Solar System' },
   ];
 
   return (
-    <div className="absolute bottom-4 right-4 z-20">
-      <div className="flex gap-2 p-2 rounded-full bg-background/30 backdrop-blur-sm border border-border/30">
-        {models.map(({ type, icon: Icon }) => (
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
+      <div className="flex gap-1 p-2 rounded-2xl bg-background/40 backdrop-blur-md border border-border/30 shadow-lg shadow-primary/5">
+        {models.map(({ type, icon: Icon, label }) => (
           <Button
             key={type}
             variant="ghost"
-            size="icon"
-            className={`w-9 h-9 rounded-full transition-all duration-300 ${
+            size="sm"
+            className={`px-3 py-2 rounded-xl transition-all duration-300 flex items-center gap-2 ${
               modelType === type
-                ? 'bg-primary/20 text-primary shadow-lg shadow-primary/20'
+                ? 'bg-primary/20 text-primary shadow-md shadow-primary/20 border border-primary/30'
                 : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
             }`}
             onClick={() => onModelChange(type)}
           >
             <Icon className="w-4 h-4" />
+            <span className="text-xs font-medium hidden sm:inline">{label}</span>
           </Button>
         ))}
       </div>
