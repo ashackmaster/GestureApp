@@ -1,22 +1,20 @@
-import { useState, useEffect } from 'react';
-import { useHandTracking } from '@/hooks/useHandTracking';
+import { useState, useEffect, useRef } from 'react';
+import { useHandTracking, GestureState } from '@/hooks/useHandTracking';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 import Scene3D from '@/components/Scene3D';
 import Header from '@/components/Header';
 import GestureIndicator from '@/components/GestureIndicator';
 import MiniCameraOverlay from '@/components/MiniCameraOverlay';
 import ModelSelector from '@/components/ModelSelector';
+import GestureGuide from '@/components/GestureGuide';
 
 type ModelType = 'torus' | 'sphere' | 'cube' | 'icosahedron' | 'car' | 'chair' | 'solar';
 
 const Index = () => {
-  const [modelType, setModelType] = useState<ModelType>('torus');
-  const {
-    videoRef,
-    canvasRef,
-    isTracking,
-    gesture,
-    startTracking,
-  } = useHandTracking();
+  const [modelType, setModelType] = useState<ModelType>('solar');
+  const { videoRef, canvasRef, isTracking, gesture, startTracking } = useHandTracking();
+  const { playSound } = useSoundEffects();
+  const prevGesture = useRef<GestureState | null>(null);
 
   // Auto-start tracking when refs are ready
   useEffect(() => {
@@ -25,6 +23,31 @@ const Index = () => {
     }, 100);
     return () => clearTimeout(timer);
   }, [startTracking]);
+
+  // Play sounds based on gesture changes
+  useEffect(() => {
+    if (!prevGesture.current) {
+      prevGesture.current = gesture;
+      return;
+    }
+
+    const prev = prevGesture.current;
+
+    if (!prev.isZoomIn && gesture.isZoomIn) playSound('zoom');
+    if (!prev.isZoomOut && gesture.isZoomOut) playSound('zoom');
+    if (!prev.isOpenHand && gesture.isOpenHand) playSound('rotate', 1000);
+    if (!prev.isPeace && gesture.isPeace) playSound('move', 1000);
+    if (!prev.isFist && gesture.isFist) playSound('freeze');
+    if (!prev.isReset && gesture.isReset) playSound('reset');
+
+    prevGesture.current = gesture;
+  }, [gesture, playSound]);
+
+  // Play sound on model change
+  const handleModelChange = (type: ModelType) => {
+    playSound('select');
+    setModelType(type);
+  };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background">
@@ -41,8 +64,11 @@ const Index = () => {
       {/* Header */}
       <Header />
 
+      {/* Gesture Guide - Top Right */}
+      <GestureGuide />
+
       {/* Model Selector - centered bottom navigation */}
-      <ModelSelector modelType={modelType} onModelChange={setModelType} />
+      <ModelSelector modelType={modelType} onModelChange={handleModelChange} />
 
       {/* Mini Camera Overlay - small corner */}
       <MiniCameraOverlay
